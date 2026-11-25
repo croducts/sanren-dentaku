@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>3連電卓 Ver.1.4｜3列で使える無料のリスト電卓</title>
+<meta name="description" content="3連電卓は、3台の電卓を並べて使える無料のWeb電卓です。罫線リストの好きな行に数字と詳細を書き込め、各列の一番上に合計が出ます。iPadやスマホでも使えます。">
+<link rel="canonical" href="https://croducts.github.io/sanren-dentaku/ver1.4/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="3連電卓 Ver.1.4">
+<meta property="og:description" content="3台の電卓を並べて使える無料のWebリスト電卓。行ごとに詳細を書けて、合計は一番上に表示。">
+<meta property="og:url" content="https://croducts.github.io/sanren-dentaku/ver1.4/">
+<meta property="og:locale" content="ja_JP">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="3連電卓">
+<meta name="theme-color" content="#2B2F7E">
+<style>
+/* 単体で動かすための基本設定 */
+html { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: #2B2F7E; -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-size: 14px; }
+[hidden] { display: none !important; }
+</style>
+<style>
+/* Layout: 藍色の台の上に3列のリスト電卓（上に合計、下に100行の罫線）と、端に3列のテンキー。見た目は1種類で固定 */
+:root {
+  color-scheme: light;
+  --desk-1: #4146A8;
+  --desk-2: #2B2F7E;
+  --desk-ink: #FFFFFF;
+  --desk-muted: rgba(255, 255, 255, 0.72);
+  --sheet-a: #FFFFFF;
+  --sheet-b: #E9F2FC;
+  --sheet-c: #FFF9DB;
+  --rule: #C9CCD8;
+  --ink: #15171D;
+  --ink-muted: #6A6E7B;
+  --total-1: #F2F3F8;
+  --total-2: #CDD1E2;
+  --focus: #3E7BF2;
+  --key-light-1: #F7F7F9;
+  --key-light-2: #D8DAE0;
+  --key-dark-1: #6C6F78;
+  --key-dark-2: #4B4E56;
+  --key-navy-1: #4255A6;
+  --key-navy-2: #2C3A7D;
+  --key-orange: #FF9A3C;
+  --foot-1: #F7F5C8;
+  --foot-2: #E3E09A;
+  --foot-ink: #3C3A10;
+  --danger: #C0392B;
+  --minus: #EC5D57;
+  --font-num: -apple-system, "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  --font-ui: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: radial-gradient(120% 90% at 20% 0%, var(--desk-1), var(--desk-2));
+  background-color: var(--desk-2);
+  color: var(--desk-ink);
+  font-family: var(--font-ui);
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  padding-block: 10px;
+}
+button { font: inherit; color: inherit; }
+
+.app { height: 100%; min-height: 560px; display: flex; flex-direction: column; gap: 8px; }
+
+.top { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.top { justify-content: space-between; }
+.top h1 { margin: 0; font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--desk-ink); }
+.top p { margin: 0; font-size: 0.74rem; color: var(--desk-muted); flex: 1; min-width: 12em; }
+.side {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.08); color: var(--desk-ink);
+  border-radius: 999px; padding: 4px 12px; font-size: 0.76rem; cursor: pointer;
+}
+.side:hover { background: rgba(255,255,255,0.16); }
+.side svg { width: 15px; height: 15px; }
+
+.main-area {
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(210px, 26vw, 300px);
+  grid-template-areas: "calcs pad";
+  gap: 12px;
+}
+.app[data-side="left"] .main-area {
+  grid-template-columns: clamp(210px, 26vw, 300px) minmax(0, 1fr);
+  grid-template-areas: "pad calcs";
+}
+
+.calcs {
+  grid-area: calcs;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* 1列（電卓1台） */
+.card {
+  container-type: inline-size;
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.c0 { --sheet: var(--sheet-a); }
+.c1 { --sheet: var(--sheet-b); }
+.c2 { --sheet: var(--sheet-c); }
+
+.name {
+  width: 100%; min-width: 0;
+  border: none; background: transparent; color: var(--desk-ink);
+  font: 700 0.85rem var(--font-ui);
+  padding: 2px 4px; border-radius: 6px;
+}
+.name:hover { background: rgba(255,255,255,0.1); }
+.name:focus-visible { outline: 2px solid var(--desk-ink); outline-offset: 0; }
+
+.total {
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--total-1), var(--total-2));
+  border: 2px solid transparent;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(0,0,0,0.25);
+  padding: 4px 10px;
+  color: var(--ink);
+  min-height: 3.6rem;
+  display: flex; flex-direction: column; justify-content: center;
+  cursor: pointer;
+}
+.card.active .total { border-color: var(--focus); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 0 0 2px rgba(62,123,242,0.35); }
+.total { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.tlabel { font-size: 0.68rem; color: var(--ink-muted); text-align: left; min-height: 1.3em; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tinput { width: 100%; min-width: 0; border: 2px solid var(--focus); border-radius: 6px; padding: 2px 6px; font: 0.8rem var(--font-ui); background: #FFFFFF; color: var(--ink); user-select: text; -webkit-user-select: text; }
+.tinput:focus-visible { outline: none; }
+.sub { font-size: 0.66rem; color: var(--ink-muted); text-align: left; min-height: 1em; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main {
+  text-align: right; font-family: var(--font-num); font-weight: 600;
+  font-variant-numeric: tabular-nums; line-height: 1.08; letter-spacing: -0.01em;
+  font-size: min(2.5rem, 17cqi); overflow-wrap: anywhere;
+}
+.main.s1 { font-size: min(2rem, 13cqi); }
+.main.s2 { font-size: min(1.5rem, 10cqi); }
+.main.err { font-family: var(--font-ui); font-size: 0.85rem; font-weight: 600; color: var(--danger); }
+
+/* 罫線の行 */
+.list {
+  flex: 1; min-height: 0; overflow-y: auto;
+  background: var(--sheet);
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  color: var(--ink);
+}
+.card.active .list { box-shadow: 0 0 0 2px var(--focus); }
+.lines { display: flex; flex-direction: column; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "note" "v";
+  width: 100%; height: 60px; flex: none;
+  border: none; border-bottom: 1px solid var(--rule); background: transparent; cursor: pointer;
+  padding: 3px 8px 4px; text-align: right; color: var(--ink);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
+}
+.row:hover { background: rgba(0,0,0,0.04); }
+.row .note { grid-area: note; align-self: start; text-align: left; font-family: var(--font-ui); font-size: min(1.55rem, 11cqi); color: var(--ink-muted); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.2em; }
+/* 詳細が1つでもある列は、行を全部高くして詳細と数字を上下に並べる */
+.card.has-notes .row { height: 96px; padding-block: 6px; }
+.card:not(.has-notes) .row .note { display: none; }
+.card:not(.has-notes) .row .v { align-self: center; }
+.row .v { grid-area: v; align-self: end; font-weight: 500; font-size: min(2.5rem, 17cqi); line-height: 1.1; min-height: 1.1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .op { margin-right: 2px; }
+.row .op.only { color: var(--ink-muted); }
+.row.cur { background: rgba(62,123,242,0.10); }
+.card.active .row.cur { background: rgba(62,123,242,0.16); box-shadow: inset 0 0 0 2px var(--focus); }
+.card.active .row.cur .v { color: #1F4FC4; }
+.card.active .row.cur .v::after {
+  content: ""; display: inline-block; width: 2px; height: 0.95em; margin-left: 2px;
+  background: var(--focus); vertical-align: -0.1em; animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.row .v.neg, .card.active .row.cur .v.neg, .row .v.neg .op.only, .main.neg { color: var(--minus); }
+.note-edit { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px; background: #FFFFFF; border-bottom: 1px solid var(--rule); }
+.note-edit input {
+  flex: 1 1 8em; min-width: 0;
+  border: 2px solid var(--focus); border-radius: 6px; padding: 5px 8px;
+  font: 0.85rem var(--font-ui); background: #FFFFFF; color: var(--ink);
+}
+.note-edit input:focus-visible { outline: none; }
+.note-edit button { flex: none; border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; background: var(--focus); color: #FFFFFF; cursor: pointer; }
+.note-edit button.ghost { background: #E4E6EC; color: var(--ink); }
+
+/* 列の下のボタン */
+.foot { display: flex; gap: 4px; }
+.fb {
+  flex: 1; min-width: 0;
+  height: 34px; border-radius: 7px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.35);
+  background: linear-gradient(180deg, var(--foot-1), var(--foot-2));
+  color: var(--foot-ink); font-size: 0.78rem; font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
+}
+.fb:active { filter: brightness(0.93); }
+.fb.armed { background: var(--danger); color: #FFFFFF; }
+
+/* テンキー（3列） */
+.pad { grid-area: pad; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.keys {
+  flex: 1; min-height: 0; max-height: 640px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(38px, 1fr));
+  gap: 6px;
+}
+.keys .k { grid-column: span 2; }
+.keys .k.half { grid-column: span 3; }
+.k:disabled { opacity: 0.45; cursor: default; }
+.k {
+  border-radius: 9px; border: 1px solid rgba(0,0,0,0.45);
+  background: linear-gradient(180deg, var(--key-light-1), var(--key-light-2));
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 1px rgba(0,0,0,0.3);
+  font-family: var(--font-num); font-weight: 500; font-size: 1.45rem;
+  cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  display: grid; place-items: center;
+}
+.k:active, .k.pressed { filter: brightness(0.86); }
+.k:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+.k.op, .k.eq, .k.clr {
+  background: linear-gradient(180deg, var(--key-dark-1), var(--key-dark-2));
+  color: #FFFFFF; font-size: 1.6rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 1px rgba(0,0,0,0.3);
+}
+.k.clr { color: var(--key-orange); font-size: 1.05rem; font-weight: 700; }
+.k.fn {
+  background: linear-gradient(180deg, var(--key-navy-1), var(--key-navy-2));
+  color: #FFFFFF; font-size: 1.1rem; font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 1px rgba(0,0,0,0.3);
+}
+.k.tall { grid-row: span 2; }
+.k svg { width: 22px; height: 22px; }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  background: #15171D; color: #FFFFFF;
+  font-size: 0.82rem; padding: 8px 16px; border-radius: 999px;
+  z-index: 20; max-width: calc(100% - 32px);
+}
+
+/* 列の切り替えボタン（縦長のときだけ表示） */
+.switch { display: none; }
+.sw-btn {
+  min-width: 0; height: 34px; border-radius: 7px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.35);
+  background: var(--sheet); color: var(--ink);
+  font-size: 0.78rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px;
+  opacity: 0.7;
+}
+.sw-btn[aria-pressed="true"] { opacity: 1; border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
+
+/* 縦長：テンキーは横のまま、列は選んだ1つだけ表示 */
+@media (orientation: portrait) {
+  .main-area { grid-template-columns: minmax(0, 1fr) clamp(150px, 44vw, 260px); }
+  .app[data-side="left"] .main-area { grid-template-columns: clamp(150px, 44vw, 260px) minmax(0, 1fr); }
+  .calcs { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .card:not(.active) { display: none; }
+}
+
+/* 横長でもとても幅が狭いとき：テンキーは下 */
+@media (max-width: 639px) and (orientation: landscape) {
+  .app { min-height: 720px; }
+  .side, .top p { display: none; }
+  .main-area, .app[data-side="left"] .main-area {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "calcs" "pad";
+  }
+  .keys { grid-template-rows: repeat(9, 44px); max-height: none; }
+  .fb { font-size: 0.7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.active .row.cur .v::after { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app" data-side="right">
+  <header class="top">
+    <h1>3連電卓 <span style="font-weight:500;font-size:0.8em;opacity:0.75">Ver.1.4</span></h1>
+    <button class="side" id="side" type="button"></button>
+  </header>
+  <div class="main-area">
+    <main class="calcs" id="calcs"></main>
+    <aside class="pad" id="pad" aria-label="テンキー">
+      <div class="keys" id="keys"></div>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  const LETTERS = ['A', 'B', 'C'];
+  const LINES = 100;
+  const STORE = 'triple-calc-v3';
+  const OPS = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+  const isOp = t => t === '+' || t === '-' || t === '*' || t === '/';
+
+  const ICON_BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6-7z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></svg>';
+  const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+  const ICON_UNDO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
+  const ICON_REDO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>';
+  const ICON_SWAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></svg>';
+
+  // [キー, 表示, 種類, 読み上げ名]
+  const KEYS = [
+    ['undo', ICON_UNDO, 'fn half', '一つ戻る'], ['redo', ICON_REDO, 'fn half', '一つ進む'],
+    ['neg', '±', 'fn', '符号を反転'], ['pct', '%', 'fn', 'パーセント'], ['copy', ICON_COPY, 'fn', '合計をコピー'],
+    ['7', '7'], ['8', '8'], ['9', '9'],
+    ['4', '4'], ['5', '5'], ['6', '6'],
+    ['1', '1'], ['2', '2'], ['3', '3'],
+    ['0', '0'], ['00', '00'], ['.', '.'],
+    ['back', ICON_BACK, 'fn', '1文字消す'], ['*', '×', 'op', '掛ける'], ['+', '+', 'op tall', '足す'],
+    ['c', 'C', 'clr', 'この行の数字を消す'], ['/', '÷', 'op', '割る'],
+    ['ac', 'AC', 'clr', 'この行を全部消す'], ['-', '−', 'op', '引く'], ['=', '=', 'eq', '次の行へ'],
+  ];
+
+  /*
+    電卓1列の状態
+    lines:  100行 [{ v: '1280' または ''(空), op: '+', note: '食費' }]
+            op はその行を前までの結果にどう計算するか（最初の数字の行では使わない）
+    cur:    いま入力する行の番号
+    fresh:  次に数字を押したら行の数字を置き換える
+  */
+  const blankLine = () => ({ v: '', op: '+', note: '' });
+  const fresh = name => ({ name, totalNote: '', lines: Array.from({ length: LINES }, blankLine), cur: 0, fresh: true, example: false, noteEdit: null });
+
+  function seed() {
+    return [fresh('電卓 A'), fresh('電卓 B'), fresh('電卓 C')];
+  }
+
+  let calcs = seed();
+  let active = 0;
+  let side = 'right';
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved && Array.isArray(saved.calcs) && saved.calcs.length === 3) {
+      calcs = saved.calcs.map((s, i) => {
+        const c = Object.assign(fresh('電卓 ' + LETTERS[i]), s, { noteEdit: null, fresh: true });
+        // 以前の例の数字が残っていたら空にする
+        if (c.example || !Array.isArray(c.lines)) { c.lines = []; c.cur = 0; c.example = false; }
+        while (c.lines.length < LINES) c.lines.push(blankLine());
+        c.cur = Math.min(LINES - 1, Math.max(0, c.cur | 0));
+        return c;
+      });
+      active = Math.min(2, Math.max(0, saved.active | 0));
+      if (saved.side === 'left') side = 'left';
+    }
+  } catch (e) { /* 保存領域が使えないときは初期状態で動かす */ }
+
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({ calcs: calcs.map(s => Object.assign({}, s, { noteEdit: null })), active, side }));
+    } catch (e) {}
+  }
+
+  /* ---------- 数値まわり ---------- */
+  function numToStr(n) {
+    if (!Number.isFinite(n)) return null;
+    let r = parseFloat(n.toPrecision(12));
+    if (Object.is(r, -0)) r = 0;
+    const a = Math.abs(r);
+    if (r !== 0 && (a >= 1e15 || a < 1e-9)) return r.toExponential(9).replace(/\.?0+e/, 'e');
+    let s = String(r);
+    if (s.includes('e')) s = r.toFixed(12).replace(/\.?0+$/, '');
+    return s;
+  }
+
+  // 数字の入った行だけを上から順に計算（× ÷ は + − より先）
+  function total(s) {
+    const filled = s.lines.filter(l => l.v !== '');
+    if (!filled.length) return '0';
+    const terms = [parseFloat(filled[0].v)];
+    const signs = [1];
+    for (let i = 1; i < filled.length; i++) {
+      const { op } = filled[i], v = parseFloat(filled[i].v);
+      if (op === '*') terms[terms.length - 1] *= v;
+      else if (op === '/') terms[terms.length - 1] /= v;
+      else { terms.push(v); signs.push(op === '-' ? -1 : 1); }
+    }
+    return numToStr(terms.reduce((sum, x, i) => sum + signs[i] * x, 0));
+  }
+
+  function fmtNum(s) {
+    if (s == null) return '—';
+    if (s.includes('e')) return s.replace(/^-/, '−').replace('e+', 'e');
+    const neg = s.startsWith('-');
+    const body = neg ? s.slice(1) : s;
+    const [ip, dp] = body.split('.');
+    const grouped = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '−' : '') + grouped + (body.includes('.') ? '.' + dp : '');
+  }
+  const digitCount = s => s.replace(/[^0-9]/g, '').length;
+
+  // 行の数字の編集
+  function editNumber(v, k, isFresh) {
+    if (k === '00') return editNumber(editNumber(v, '0', isFresh), '0', false);
+    if (/^\d$/.test(k)) {
+      if (isFresh || v === '' || v.includes('e') || v === '0') return k;
+      if (v === '-0') return '-' + k;
+      return digitCount(v) < 15 ? v + k : v;
+    }
+    if (k === '.') {
+      if (isFresh || v === '' || v.includes('e')) return '0.';
+      return v.includes('.') ? v : v + '.';
+    }
+    if (k === 'neg') { if (v === '') return '-0'; return v.startsWith('-') ? v.slice(1) : '-' + v; }
+    if (k === 'pct') return v === '' ? v : (numToStr(parseFloat(v) / 100) || '0');
+    if (k === 'back') {
+      if (v.includes('e')) return '';
+      const n = v.slice(0, -1);
+      return n === '-' ? '' : n;
+    }
+    return v;
+  }
+  const isNumKey = k => /^\d$/.test(k) || k === '00' || k === '.';
+
+  /* ---------- 入力処理 ---------- */
+  function moveTo(i, l) {
+    const s = calcs[i];
+    s.cur = Math.min(LINES - 1, Math.max(0, l));
+    s.fresh = true;
+  }
+
+  /* ---------- 戻る・進む ---------- */
+  const undoStack = [], redoStack = [];
+  const snap = i => JSON.stringify({ lines: calcs[i].lines, totalNote: calcs[i].totalNote || '' });
+  function record(i, before, cur) {
+    if (before === snap(i)) return;
+    undoStack.push({ i, state: before, cur });
+    if (undoStack.length > 300) undoStack.shift();
+    redoStack.length = 0;
+    updateUndoBtns();
+  }
+  function restore(i, state, cur) {
+    const s = calcs[i], o = JSON.parse(state);
+    s.lines = o.lines; s.totalNote = o.totalNote;
+    s.cur = cur; s.fresh = true; s.noteEdit = null;
+  }
+  function step(from, to) {
+    const e = from.pop();
+    if (!e) return;
+    to.push({ i: e.i, state: snap(e.i), cur: calcs[e.i].cur });
+    restore(e.i, e.state, e.cur);
+    setActive(e.i);
+    render(e.i); save();
+    updateUndoBtns();
+  }
+  const undo = () => step(undoStack, redoStack);
+  const redo = () => step(redoStack, undoStack);
+  function updateUndoBtns() {
+    const u = keysEl.querySelector('[data-k="undo"]'), r = keysEl.querySelector('[data-k="redo"]');
+    if (u) u.disabled = !undoStack.length;
+    if (r) r.disabled = !redoStack.length;
+  }
+
+  function press(i, k) {
+    const s = calcs[i];
+    if (s.noteEdit) commitNote(i);
+    const before = snap(i), beforeCur = s.cur;
+    s.example = false;
+    const line = s.lines[s.cur];
+
+    if (isNumKey(k) || k === 'neg' || k === 'pct') {
+      line.v = editNumber(line.v, k, s.fresh && (isNumKey(k)));
+      if (isNumKey(k)) s.fresh = false;
+    } else if (k === 'back') {
+      line.v = editNumber(line.v, 'back', false);
+      s.fresh = false;
+    } else if (isOp(k)) {
+      if (line.v === '') line.op = k;
+      else if (s.cur < LINES - 1) {
+        moveTo(i, s.cur + 1);
+        s.lines[s.cur].op = k;
+      }
+    } else if (k === '=') {
+      if (line.v.endsWith('.')) line.v = line.v.slice(0, -1);
+      if (s.cur < LINES - 1) moveTo(i, s.cur + 1);
+    } else if (k === 'c') {
+      line.v = ''; s.fresh = true;
+    } else if (k === 'ac') {
+      s.lines[s.cur] = blankLine(); s.fresh = true;
+    }
+    record(i, before, beforeCur);
+    render(i); save();
+  }
+
+  // 他の列から合計を受け取る：いまの行に入れる
+  function putValue(i, v) {
+    const s = calcs[i];
+    s.example = false;
+    if (s.lines[s.cur].v !== '' && s.cur < LINES - 1) moveTo(i, s.cur + 1);
+    s.lines[s.cur].v = v;
+    s.fresh = true;
+    render(i); save();
+  }
+
+  function selectLine(i, l) {
+    moveTo(i, l);
+    render(i); save();
+  }
+
+  // 内訳メモ（長押しで開く）
+  function openNote(i, l) {
+    const s = calcs[i];
+    s.noteEdit = l;
+    moveTo(i, l);
+    render(i);
+    const inp = cards[i].querySelector('.note-edit input');
+    if (inp) { inp.focus(); inp.select(); }
+  }
+
+  function commitNote(i) {
+    const s = calcs[i];
+    if (s.noteEdit == null) return;
+    const l = s.noteEdit;
+    const inp = cards[i].querySelector('.note-edit input');
+    const before = snap(i), beforeCur = s.cur;
+    s.noteEdit = null;
+    if (inp) { s.lines[l].note = inp.value.trim(); s.example = false; }
+    record(i, before, beforeCur);
+    render(i); save();
+  }
+
+  function cancelNote(i) {
+    calcs[i].noteEdit = null;
+    render(i);
+  }
+
+  function copyTotal(i) {
+    const v = total(calcs[i]);
+    if (v == null) { toast('コピーできる値がありません'); return; }
+    try {
+      navigator.clipboard.writeText(v).then(() => toast(`${fmtNum(v)} をコピーしました`), () => toast('コピーできませんでした'));
+    } catch (e) { toast('コピーできませんでした'); }
+  }
+
+  /* ---------- 画面 ---------- */
+  const app = document.getElementById('app');
+  const calcsEl = document.getElementById('calcs');
+  const keysEl = document.getElementById('keys');
+  const sideBtn = document.getElementById('side');
+  const cards = [];
+  const swBtns = [];
+  const switchEl = document.createElement('nav');
+  switchEl.className = 'switch';
+  switchEl.setAttribute('aria-label', '電卓の切り替え');
+  calcsEl.appendChild(switchEl);
+
+  keysEl.innerHTML = KEYS.map(([k, label, cls, aria]) =>
+    `<button class="k ${cls || ''}" data-k="${k}" type="button"${aria ? ` aria-label="${aria}"` : ''}>${label}</button>`).join('');
+  keysEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-k]');
+    if (!b) return;
+    if (b.dataset.k === 'copy') copyTotal(active);
+    else if (b.dataset.k === 'undo') undo();
+    else if (b.dataset.k === 'redo') redo();
+    else press(active, b.dataset.k);
+  });
+
+  calcs.forEach((s, i) => {
+    const card = document.createElement('section');
+    card.className = 'card c' + i;
+    card.setAttribute('aria-label', '電卓 ' + LETTERS[i]);
+    const others = [0, 1, 2].filter(j => j !== i);
+    card.innerHTML = `
+      <input class="name" id="name-${i}" maxlength="14" aria-label="電卓 ${LETTERS[i]} の名前">
+      <div class="total">
+        <div class="tlabel"></div>
+        <input class="tinput" id="tnote-${i}" maxlength="30" aria-label="合計の詳細" placeholder="詳細" enterkeyhint="done" hidden>
+        <div class="main" aria-live="polite"></div>
+      </div>
+      <div class="list">
+        <div class="lines"></div>
+      </div>
+      <div class="foot">
+        <button class="fb clear" type="button" title="この列を全部消す">AC</button>
+      </div>`;
+    calcsEl.appendChild(card);
+    cards.push(card);
+
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'sw-btn c' + i;
+    sw.textContent = s.name;
+    sw.addEventListener('click', () => setActive(i));
+    switchEl.appendChild(sw);
+    swBtns.push(sw);
+
+    const nameInput = card.querySelector('.name');
+    nameInput.value = s.name;
+    nameInput.addEventListener('input', () => { s.name = nameInput.value; sw.textContent = s.name; save(); });
+    nameInput.addEventListener('blur', () => {
+      if (!nameInput.value.trim()) { s.name = '電卓 ' + LETTERS[i]; nameInput.value = s.name; sw.textContent = s.name; save(); }
+    });
+
+    card.addEventListener('pointerdown', () => { if (active !== i) setActive(i); });
+
+    const linesEl = card.querySelector('.lines');
+
+    // 合計の箱の長押し → 文字を入力
+    const totalEl = card.querySelector('.total');
+    const tlabel = card.querySelector('.tlabel');
+    const tinput = card.querySelector('.tinput');
+    let tTimer = 0, tStart = null;
+    const stopT = () => { clearTimeout(tTimer); tStart = null; };
+    const openTotalNote = () => {
+      stopT();
+      if (!tinput.hidden) return;
+      tinput.value = s.totalNote || '';
+      tlabel.hidden = true; tinput.hidden = false;
+      tinput.focus(); tinput.select();
+    };
+    const closeTotalNote = saveIt => {
+      if (tinput.hidden) return;
+      if (saveIt) { const before = snap(i); s.totalNote = tinput.value.trim(); record(i, before, s.cur); }
+      tinput.hidden = true; tlabel.hidden = false;
+      render(i); if (saveIt) save();
+    };
+    totalEl.addEventListener('pointerdown', e => {
+      if (e.target === tinput) return;
+      tStart = { x: e.clientX, y: e.clientY };
+      clearTimeout(tTimer);
+      tTimer = setTimeout(openTotalNote, 500);
+    });
+    totalEl.addEventListener('pointermove', e => {
+      if (tStart && Math.hypot(e.clientX - tStart.x, e.clientY - tStart.y) > 8) stopT();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => totalEl.addEventListener(ev, () => clearTimeout(tTimer)));
+    totalEl.addEventListener('contextmenu', e => { if (e.target === tinput) return; e.preventDefault(); openTotalNote(); });
+    tinput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); closeTotalNote(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeTotalNote(false); }
+    });
+    tinput.addEventListener('blur', () => closeTotalNote(true));
+
+    // 行の長押し → 内訳メモ
+    let lpTimer = 0, lpStart = null, lpFired = false;
+    const stopLp = () => { clearTimeout(lpTimer); lpStart = null; };
+    linesEl.addEventListener('pointerdown', e => {
+      if (e.target.closest('.note-edit button')) { e.preventDefault(); return; }
+      const row = e.target.closest('.row');
+      if (!row) return;
+      lpFired = false;
+      lpStart = { x: e.clientX, y: e.clientY };
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => { lpFired = true; lpStart = null; openNote(i, +row.dataset.l); }, 500);
+    });
+    linesEl.addEventListener('pointermove', e => {
+      if (lpStart && Math.hypot(e.clientX - lpStart.x, e.clientY - lpStart.y) > 8) stopLp();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => linesEl.addEventListener(ev, stopLp));
+    linesEl.addEventListener('contextmenu', e => {
+      const row = e.target.closest('.row');
+      if (!row) return;
+      e.preventDefault();
+      stopLp();
+      lpFired = true;
+      if (calcs[i].noteEdit !== +row.dataset.l) openNote(i, +row.dataset.l);
+    });
+    linesEl.addEventListener('keydown', e => {
+      if (!e.target.matches('.note-edit input')) return;
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitNote(i); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelNote(i); }
+    });
+    linesEl.addEventListener('focusout', e => {
+      if (e.target.matches('.note-edit input')) commitNote(i);
+    });
+
+    linesEl.addEventListener('click', e => {
+      if (e.target.closest('[data-note-save]')) { commitNote(i); return; }
+      if (e.target.closest('[data-note-cancel]')) { cancelNote(i); return; }
+      if (e.target.closest('.note-edit')) return;
+      if (lpFired) { lpFired = false; return; }
+      const row = e.target.closest('.row');
+      if (row) selectLine(i, +row.dataset.l);
+    });
+
+    card.querySelectorAll('[data-send]').forEach(b => {
+      b.addEventListener('pointerdown', e => e.stopPropagation());
+      b.addEventListener('click', () => {
+        const v = total(s);
+        const j = +b.dataset.send;
+        if (v == null) { toast('送れる値がありません'); return; }
+        putValue(j, v);
+        setActive(j);
+        toast(`${fmtNum(v)} を ${calcs[j].name} に送りました`);
+      });
+    });
+
+    card.querySelector('.clear').addEventListener('click', () => {
+      const before = snap(i), beforeCur = s.cur;
+      s.lines = Array.from({ length: LINES }, blankLine);
+      s.noteEdit = null; s.example = false; s.totalNote = '';
+      moveTo(i, 0);
+      record(i, before, beforeCur);
+      render(i); save();
+      cards[i].querySelector('.list').scrollTop = 0;
+    });
+  });
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function render(i) {
+    const s = calcs[i], card = cards[i];
+
+    // 100行
+    const firstFilled = s.lines.findIndex(l => l.v !== '');
+    let html = '';
+    s.lines.forEach((line, l) => {
+      const showOp = line.op !== '+' && l !== firstFilled;
+      const opHtml = showOp ? `<span class="op${line.v === '' ? ' only' : ''}">${OPS[line.op]}</span>` : '';
+      // マイナスに見える行（負の数、または − の行）は赤
+      const neg = line.v.startsWith('-') !== (showOp && line.op === '-');
+      html += `<button class="row${l === s.cur ? ' cur' : ''}" type="button" data-l="${l}" aria-label="${l + 1}行目${line.note ? ' ' + esc(line.note) : ''}${line.v ? ' ' + esc(line.v) : ' 空き'}">
+        <span class="note">${esc(line.note)}</span><span class="v${neg ? ' neg' : ''}">${opHtml}${line.v === '' ? '' : esc(fmtNum(line.v))}</span>
+      </button>`;
+      if (s.noteEdit === l) {
+        html += `<div class="note-edit">
+          <input id="note-${i}" maxlength="30" placeholder="詳細" value="${esc(line.note)}" aria-label="${l + 1}行目の詳細" enterkeyhint="done">
+          <button type="button" data-note-save>保存</button>
+          <button type="button" class="ghost" data-note-cancel>やめる</button>
+        </div>`;
+      }
+    });
+    card.classList.toggle('has-notes', s.lines.some(line => line.note));
+    card.querySelector('.lines').innerHTML = html;
+    keepCursorVisible(i);
+
+    // 一番上：合計
+    const main = card.querySelector('.main');
+    card.querySelector('.tlabel').textContent = s.totalNote || '';
+    const t = total(s);
+    main.textContent = t == null ? '0 で割ることはできません' : fmtNum(t);
+    const len = main.textContent.length;
+    main.className = 'main' + (t == null ? ' err' : len > 13 ? ' s2' : len > 9 ? ' s1' : '') + (t != null && t.startsWith('-') ? ' neg' : '');
+  }
+
+  // 入力中の行がリストの外に出たら、その行が見えるところまでスクロール
+  function keepCursorVisible(i) {
+    const list = cards[i].querySelector('.list');
+    const row = list.querySelector('.row.cur');
+    if (!row) return;
+    const top = row.offsetTop - list.offsetTop;
+    const bottom = top + row.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  }
+
+  function setActive(i) {
+    active = i;
+    cards.forEach((c, j) => c.classList.toggle('active', j === i));
+    swBtns.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+    save();
+  }
+
+  function renderSide() {
+    app.dataset.side = side;
+    sideBtn.innerHTML = `${ICON_SWAP}テンキーを${side === 'right' ? '左' : '右'}へ`;
+  }
+  sideBtn.addEventListener('click', () => { side = side === 'right' ? 'left' : 'right'; renderSide(); save(); });
+
+  /* ---------- キーボード ---------- */
+  const KEYMAP = {
+    '+': '+', '-': '-', '*': '*', 'x': '*', 'X': '*', '/': '/',
+    '.': '.', ',': '.', 'Enter': '=', '=': '=', 'Backspace': 'back',
+    'Escape': 'ac', 'Delete': 'c', 'c': 'c', 'C': 'c', '%': 'pct',
+  };
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input')) { if (e.key === 'Enter') e.target.blur(); return; }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if (key === 'y') { e.preventDefault(); redo(); }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      setActive((active + (e.key === 'ArrowRight' ? 1 : 2)) % 3);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectLine(active, calcs[active].cur + (e.key === 'ArrowDown' ? 1 : -1));
+      return;
+    }
+    const k = /^\d$/.test(e.key) ? e.key : KEYMAP[e.key];
+    if (!k) return;
+    e.preventDefault();
+    press(active, k);
+    const b = keysEl.querySelector(`[data-k="${CSS.escape(k)}"]`);
+    if (b) { b.classList.add('pressed'); setTimeout(() => b.classList.remove('pressed'), 110); }
+  });
+
+  /* ---------- お知らせ ---------- */
+  const toastEl = document.getElementById('toast');
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 1800);
+  }
+
+  renderSide();
+  updateUndoBtns();
+  calcs.forEach((_, i) => render(i));
+  setActive(active);
+})();
+</script>
+</body>
+</html>
